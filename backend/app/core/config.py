@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     BACKEND_URL: str = "http://localhost:8000"
     META_CLIENT_ID: Optional[str] = None
     META_CLIENT_SECRET: Optional[str] = None
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_ANON_KEY: Optional[str] = None
+    SUPABASE_SERVICE_KEY: Optional[str] = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

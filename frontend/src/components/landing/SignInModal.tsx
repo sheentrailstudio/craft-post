@@ -19,7 +19,7 @@ export default function SignInModal({
       "craftpost_landing",
       JSON.stringify(landingDraft),
     );
-    window.location.href = "/login";
+    window.location.href = "/login?redirectTo=/app/drafts/new";
   }
 
   return (

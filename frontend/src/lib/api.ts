@@ -1,3 +1,5 @@
+import { getSupabaseBrowserClient } from "@/lib/supabase";
+
 export type RefinePayload = {
   draft: string;
   user_subprompt?: string;
@@ -68,9 +70,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 async function postRefine(payload: RefinePayload): Promise<RefineResponse> {
   const response = await fetch(`${API_URL}/api/draft/refine`, {
     method: "POST",
-    headers: {
+    headers: await authHeaders({
       "Content-Type": "application/json",
-    },
+    }),
     body: JSON.stringify(payload),
   });
 
@@ -120,6 +122,7 @@ export async function generateCaption(
 export async function getPlatforms(): Promise<Platform[]> {
   const response = await fetch(`${API_URL}/api/platforms`, {
     method: "GET",
+    headers: await authHeaders(),
   });
 
   if (!response.ok) {
@@ -135,9 +138,9 @@ export async function publishPost(
 ): Promise<PublishResponse> {
   const response = await fetch(`${API_URL}/api/publish`, {
     method: "POST",
-    headers: {
+    headers: await authHeaders({
       "Content-Type": "application/json",
-    },
+    }),
     body: JSON.stringify(payload),
   });
 
@@ -155,6 +158,7 @@ export async function getBestTime(
   const query = encodeURIComponent(platforms.join(","));
   const response = await fetch(`${API_URL}/api/publish/best-time?platforms=${query}`, {
     method: "GET",
+    headers: await authHeaders(),
   });
 
   if (!response.ok) {
@@ -169,10 +173,43 @@ export function connectSocialAccount(platform: string): void {
   window.location.href = `${API_URL}/api/social/connect/${platform}`;
 }
 
+export async function ensureBackendProfile(): Promise<void> {
+  const response = await fetch(`${API_URL}/api/auth/profile`, {
+    method: "GET",
+    headers: await authHeaders(),
+  });
+
+  if (!response.ok) {
+    const message = await readErrorMessage(response);
+    throw new Error(message);
+  }
+}
+
+async function authHeaders(headers: HeadersInit = {}): Promise<HeadersInit> {
+  const supabase = getSupabaseBrowserClient();
+  const {
+    data: { session },
+  } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+
+  if (!session?.access_token) {
+    redirectToLogin();
+    throw new Error("請先登入");
+  }
+
+  return {
+    ...headers,
+    Authorization: `Bearer ${session.access_token}`,
+  };
+}
+
 async function readErrorMessage(response: Response) {
   try {
     const error = await response.json();
+    if (error?.code === "INVALID_TOKEN" || error?.detail?.code === "INVALID_TOKEN") {
+      redirectToLogin();
+    }
     if (typeof error?.message === "string") return error.message;
+    if (typeof error?.code === "string") return error.code;
     if (typeof error?.detail?.message === "string") return error.detail.message;
     if (typeof error?.detail?.code === "string") return error.detail.code;
   } catch {
@@ -180,4 +217,11 @@ async function readErrorMessage(response: Response) {
   }
 
   return "請求失敗";
+}
+
+function redirectToLogin(): void {
+  if (typeof window === "undefined") return;
+
+  const redirectTo = `${window.location.pathname}${window.location.search}`;
+  window.location.href = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
 }

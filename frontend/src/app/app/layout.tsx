@@ -1,4 +1,5 @@
 import Sidebar from "@/components/layout/Sidebar";
+import AppAuthGate from "@/components/auth/AppAuthGate";
 
 export default function AppLayout({
   children,
@@ -6,9 +7,11 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <main className="app-main">{children}</main>
-    </div>
+    <AppAuthGate>
+      <div className="app-shell">
+        <Sidebar />
+        <main className="app-main">{children}</main>
+      </div>
+    </AppAuthGate>
   );
 }

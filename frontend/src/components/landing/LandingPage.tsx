@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useState } from "react";
+import { useAuthSession } from "@/hooks/useAuthSession";
 import LandingNav from "./LandingNav";
 import ImageUploadBlock from "./ImageUploadBlock";
 import TextRefineBlock, { TextRefineBlockHandle } from "./TextRefineBlock";
@@ -12,11 +13,8 @@ import LandingPricing from "./LandingPricing";
 export default function LandingPage() {
   const textBlockRef = useRef<TextRefineBlockHandle>(null);
   const [signInOpen, setSignInOpen] = useState(false);
-  const isAuthenticated = useSyncExternalStore(
-    subscribeToAuthStorage,
-    getAuthSnapshot,
-    () => false,
-  );
+  const { session } = useAuthSession();
+  const isAuthenticated = Boolean(session);
   const [landingDraft, setLandingDraft] = useState({
     draft: "",
     refined: "",
@@ -142,13 +140,4 @@ function BackgroundDecor() {
       </span>
     </div>
   );
-}
-
-function subscribeToAuthStorage(onStoreChange: () => void) {
-  window.addEventListener("storage", onStoreChange);
-  return () => window.removeEventListener("storage", onStoreChange);
-}
-
-function getAuthSnapshot() {
-  return window.localStorage.getItem("craftpost_user") === "1";
 }
