@@ -1,12 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const navItems = [
   { href: "/app/drafts/new", label: "+ New draft" },
-  { href: "/app/drafts", label: "Drafts" },
-  { href: "/app/settings/identities", label: "Settings" },
+  { href: "/app/settings", label: "Settings" },
+  { href: "/pricing", label: "Pricing" },
 ];
 
 export default function Sidebar() {
+  const pathname = usePathname();
+
   return (
     <aside className="app-sidebar">
       <Link href="/" className="text-mono text-base">
@@ -16,7 +21,16 @@ export default function Sidebar() {
 
       <nav className="mt-10 grid gap-2">
         {navItems.map((item) => (
-          <Link key={item.href} href={item.href} className="app-nav-link">
+          <Link
+            key={item.href}
+            href={item.href}
+            className={[
+              "app-nav-link",
+              pathname === item.href || pathname.startsWith(`${item.href}/`)
+                ? "app-nav-link-active"
+                : "",
+            ].join(" ")}
+          >
             {item.label}
           </Link>
         ))}

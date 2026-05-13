@@ -106,6 +106,13 @@ textarea:focus-visible,
   line-height: 1.05;
 }
 
+.text-h1 {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
 .text-h2 {
   font-size: 20px;
   font-weight: 600;
@@ -332,6 +339,19 @@ textarea:focus-visible,
   border-radius: var(--radius-lg);
 }
 
+.card-interactive {
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.card-interactive:hover {
+  background: var(--bg-elevated);
+  border-color: var(--bg-border-2);
+  transform: translateY(-1px);
+}
+
 .input-surface {
   background: var(--bg-elevated);
   border: 1px solid var(--bg-border);
@@ -421,6 +441,12 @@ textarea::placeholder {
 .app-nav-link:hover {
   background: var(--bg-button-ghost-hover);
   border-color: var(--bg-border);
+  color: var(--text-primary);
+}
+
+.app-nav-link-active {
+  background: var(--accent-muted);
+  border-color: var(--accent-border);
   color: var(--text-primary);
 }
 

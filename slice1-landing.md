@@ -267,7 +267,7 @@ your content      copy instantly    all platforms
 
 | Free | Basic | Pro |
 |---|---|---|
-| $0 | $7/mo | $12/mo |
+| $0 | $8/mo | $12/mo |
 | Unlimited AI refine | Unlimited | Unlimited |
 | No publishing | 1 identity, 2 accounts | 5 identities, 10 accounts |
 | — | Publish to all platforms | Publish to all platforms |
