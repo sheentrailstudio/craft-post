@@ -1,0 +1,42 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Next.js
+.next/
+frontend/.next/
+out/
+frontend/out/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Build output
+build/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Deployment/local tool state
+.vercel/
+.railway/
