@@ -1,5 +1,5 @@
-import SettingsHome from "@/components/settings/SettingsHome";
+import { redirect } from "next/navigation";
 
 export default function SettingsPage() {
-  return <SettingsHome />;
+  redirect("/app/account");
 }

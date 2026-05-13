@@ -49,13 +49,13 @@ export default function AccountSettings() {
     <div className="mx-auto grid max-w-5xl gap-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-label mb-2">Settings</p>
+          <p className="text-label mb-2">Account</p>
           <h1 className="text-h1 mb-3">帳戶管理</h1>
           <p className="text-body max-w-2xl">
             查看目前登入帳號、方案限制與身份使用量。
           </p>
         </div>
-        <Link className="btn btn-secondary" href="/app/settings/identities">
+        <Link className="btn btn-secondary" href="/app/identities">
           管理身份
         </Link>
       </header>
@@ -84,7 +84,6 @@ export default function AccountSettings() {
       <section className="surface grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center">
         <div>
           <h2 className="text-h3 mb-2">登入工作階段</h2>
-          <p className="text-body">登出會清除本機 Supabase session，之後需要重新登入。</p>
         </div>
         <button className="btn btn-secondary" disabled={signingOut} type="button" onClick={signOut}>
           {signingOut ? "登出中" : "登出"}

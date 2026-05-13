@@ -6,10 +6,30 @@ import MediaZone from "@/components/editor/MediaZone";
 import PlatformSelector from "@/components/editor/PlatformSelector";
 import PromptPane from "@/components/editor/PromptPane";
 import { useEditorState } from "@/hooks/useEditor";
+import {
+  createDraftId,
+  getStoredDraft,
+  upsertStoredDraft,
+  updateDraftStatus,
+} from "@/lib/drafts";
+import { useParams, usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef } from "react";
 
 export default function EditorLayout() {
+  const params = useParams<{ id?: string }>();
+  const pathname = usePathname();
+  const router = useRouter();
   const { state, identities, availablePlatforms, strictMaxChars, actions } = useEditorState();
+  const loadedDraftId = useRef<string | null>(null);
   const canRefine = Boolean(state.draft.trim()) && state.platforms.length > 0;
+  const firstMedia = state.media?.items[0] ?? null;
+  const isNewDraftRoute = useMemo(() => pathname.endsWith("/drafts/new"), [pathname]);
+  const generatedNewDraftId = useMemo(
+    () => (isNewDraftRoute ? createDraftId() : null),
+    [isNewDraftRoute],
+  );
+  const draftId = params.id ?? generatedNewDraftId;
+  const visibleDraftId = draftId ?? "unsaved";
   const visibleError =
     state.error &&
     !state.error.includes("最多上傳") &&
@@ -18,6 +38,58 @@ export default function EditorLayout() {
     !state.error.includes("檔案")
       ? state.error
       : null;
+
+  useEffect(() => {
+    if (!isNewDraftRoute || !generatedNewDraftId) return;
+
+    router.replace(`/app/drafts/${generatedNewDraftId}`);
+  }, [generatedNewDraftId, isNewDraftRoute, router]);
+
+  useEffect(() => {
+    if (!params.id || loadedDraftId.current === params.id) return;
+
+    const storedDraft = getStoredDraft(params.id);
+    if (storedDraft) {
+      actions.loadSnapshot({
+        draft: storedDraft.text,
+        user_subprompt: storedDraft.prompt ?? "",
+        platforms: storedDraft.platforms,
+        identity_id: storedDraft.identity_id,
+      });
+    }
+
+    loadedDraftId.current = params.id;
+  }, [actions, params.id]);
+
+  useEffect(() => {
+    if (!draftId || !state.draft.trim()) return;
+
+    const timeout = window.setTimeout(() => {
+      upsertStoredDraft({
+        id: draftId,
+        text: state.draft,
+        prompt: state.user_subprompt,
+        status: "draft",
+        platforms: state.platforms,
+        identity_id: state.identity_id,
+        thumbnail_url: firstMedia?.url ?? null,
+        media_kind: firstMedia?.kind ?? null,
+        aspect_ratio: state.media?.aspectRatio ?? "1:1",
+        updated_at: new Date().toISOString(),
+      });
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    draftId,
+    firstMedia?.kind,
+    firstMedia?.url,
+    state.draft,
+    state.identity_id,
+    state.media?.aspectRatio,
+    state.platforms,
+    state.user_subprompt,
+  ]);
 
   return (
     <div className="editor-layout">
@@ -85,11 +157,12 @@ export default function EditorLayout() {
           isRefining={state.is_refining}
           onRefine={actions.refineDraft}
           onPublish={() => {
-            if (!state.identity_id) return false;
+            if (!state.identity_id) return null;
             sessionStorage.setItem(
               "craftpost.publishDraft",
               JSON.stringify({
                 identity_id: state.identity_id,
+                draft_id: visibleDraftId,
                 text: state.draft,
                 platforms: state.platforms,
                 media: state.media
@@ -105,7 +178,8 @@ export default function EditorLayout() {
                   : null,
               }),
             );
-            return true;
+            if (draftId) updateDraftStatus(draftId, "confirmed");
+            return visibleDraftId;
           }}
         />
       </div>

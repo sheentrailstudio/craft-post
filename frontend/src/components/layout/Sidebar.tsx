@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { href: "/app/drafts/new", label: "+ New draft" },
-  { href: "/app/settings", label: "Settings" },
-  { href: "/pricing", label: "Pricing" },
+  { href: "/app/drafts", label: "Drafts", section: "drafts" },
+  { href: "/app/drafts/new", label: "+ New draft", exact: true },
+  { href: "/app/identities", label: "身份管理" },
+  { href: "/app/account", label: "帳戶管理" },
+  { href: "/pricing", label: "Pricing", exact: true },
 ];
 
 export default function Sidebar() {
@@ -26,7 +28,7 @@ export default function Sidebar() {
             href={item.href}
             className={[
               "app-nav-link",
-              pathname === item.href || pathname.startsWith(`${item.href}/`)
+              isActiveNavItem(pathname, item)
                 ? "app-nav-link-active"
                 : "",
             ].join(" ")}
@@ -37,4 +39,17 @@ export default function Sidebar() {
       </nav>
     </aside>
   );
+}
+
+function isActiveNavItem(
+  pathname: string,
+  item: { href: string; exact?: boolean; section?: string },
+) {
+  if (item.section === "drafts") {
+    return pathname === "/app/drafts" || (
+      pathname.startsWith("/app/drafts/") && pathname !== "/app/drafts/new"
+    );
+  }
+
+  return pathname === item.href || (!item.exact && pathname.startsWith(`${item.href}/`));
 }

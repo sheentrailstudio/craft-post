@@ -28,6 +28,13 @@ export interface EditorState {
   error: string | null;
 }
 
+export type EditorSnapshot = Partial<
+  Pick<
+    EditorState,
+    "draft" | "user_subprompt" | "platforms" | "identity_id" | "media"
+  >
+>;
+
 const DEFAULT_PLATFORMS: Platform[] = [
   {
     id: "instagram",
@@ -234,6 +241,14 @@ export function useEditorState() {
     }
   }, []);
 
+  const loadSnapshot = useCallback((snapshot: EditorSnapshot) => {
+    setState((current) => ({
+      ...current,
+      ...snapshot,
+      error: null,
+    }));
+  }, []);
+
   const refineDraft = useCallback(async () => {
     const draft = state.draft.trim();
     if (!draft || !state.platforms.length || state.is_refining) return;
@@ -281,6 +296,7 @@ export function useEditorState() {
       setPrompt,
       togglePlatform,
       setIdentity,
+      loadSnapshot,
     },
   };
 }

@@ -117,7 +117,7 @@ async def callback(
         },
         on_conflict="identity_id,platform,platform_account_id",
     )
-    return RedirectResponse(f"{settings.FRONTEND_URL}/app/settings/identities?connected={platform}")
+    return RedirectResponse(f"{settings.FRONTEND_URL}/app/identities?connected={platform}")
 
 
 @router.delete("/social/accounts/{account_id}")

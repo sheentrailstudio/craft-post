@@ -19,7 +19,7 @@ const plans = [
     caption: "單一品牌或個人帳號的發布工作流。",
     features: ["Unlimited AI refine", "1 identity", "2 accounts per identity", "Publish enabled"],
     cta: "設定 Basic 身份",
-    href: "/app/settings/identities",
+    href: "/app/identities",
     featured: true,
   },
   {
@@ -28,7 +28,7 @@ const plans = [
     caption: "多品牌、多身份與更多社群帳號管理。",
     features: ["Unlimited AI refine", "5 identities", "10 accounts per identity", "Publish enabled"],
     cta: "設定 Pro 身份",
-    href: "/app/settings/identities",
+    href: "/app/identities",
     featured: false,
   },
 ];
@@ -107,7 +107,7 @@ export default function PricingPage() {
                 目前頁面先承接方案資訊與升級入口；實際 Paddle 訂閱會在計費 slice 接上。
               </p>
             </div>
-            <Link className="btn btn-secondary" href="/app/settings/identities">
+            <Link className="btn btn-secondary" href="/app/identities">
               管理身份與帳號
             </Link>
           </section>

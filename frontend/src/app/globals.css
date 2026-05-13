@@ -455,6 +455,90 @@ textarea::placeholder {
   padding: 24px;
 }
 
+.draft-list {
+  display: grid;
+  gap: 12px;
+}
+
+.draft-row {
+  background: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-radius: var(--radius-lg);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 116px minmax(0, 1fr);
+  min-height: 142px;
+  padding: 14px;
+}
+
+.draft-thumb {
+  align-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--bg-border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  height: 114px;
+  justify-content: center;
+  overflow: hidden;
+  width: 114px;
+}
+
+.draft-thumb img,
+.draft-thumb video {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.draft-thumb-text {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 32px;
+}
+
+.draft-preview {
+  color: var(--text-primary);
+  display: -webkit-box;
+  font-size: 15px;
+  line-height: 1.65;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.progress-pill {
+  border: 1px solid var(--bg-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+}
+
+.progress-draft {
+  background: rgba(85, 85, 85, 0.16);
+  border-color: var(--status-draft);
+  color: var(--text-secondary);
+}
+
+.progress-confirmed {
+  background: rgba(255, 92, 58, 0.12);
+  border-color: var(--status-confirmed);
+  color: var(--status-confirmed);
+}
+
+.progress-scheduled {
+  background: rgba(192, 132, 252, 0.12);
+  border-color: var(--status-scheduled);
+  color: var(--status-scheduled);
+}
+
+.progress-published {
+  background: var(--success-muted);
+  border-color: var(--status-published);
+  color: var(--status-published);
+}
+
 .editor-layout {
   display: grid;
   gap: 18px;
@@ -681,6 +765,15 @@ textarea::placeholder {
 
   .account-row {
     grid-template-columns: 1fr;
+  }
+
+  .draft-row {
+    grid-template-columns: 86px minmax(0, 1fr);
+  }
+
+  .draft-thumb {
+    height: 84px;
+    width: 84px;
   }
 }
 

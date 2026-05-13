@@ -117,7 +117,7 @@ export default function IdentitiesSettings() {
     <div className="mx-auto grid max-w-5xl gap-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-label mb-2">Settings</p>
+          <p className="text-label mb-2">Identities</p>
           <h1 className="text-h2">身份管理</h1>
         </div>
         <button

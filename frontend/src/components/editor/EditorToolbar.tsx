@@ -6,7 +6,7 @@ type EditorToolbarProps = {
   canRefine: boolean;
   isRefining: boolean;
   onRefine: () => void;
-  onPublish: () => boolean;
+  onPublish: () => string | null;
 };
 
 export default function EditorToolbar({
@@ -39,10 +39,11 @@ export default function EditorToolbar({
           className="btn btn-primary"
           type="button"
           onClick={() => {
-            if (onPublish()) {
-              router.push("/app/publish/mock-post-id");
+            const postId = onPublish();
+            if (postId) {
+              router.push(`/app/publish/${postId}`);
             } else {
-              router.push("/app/settings/identities");
+              router.push("/app/identities");
             }
           }}
         >

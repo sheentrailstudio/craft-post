@@ -14,6 +14,7 @@ import {
   publishPost,
   PublishResult,
 } from "@/lib/api";
+import { updateDraftStatus } from "@/lib/drafts";
 
 type PublishControlProps = {
   postId: string;
@@ -92,7 +93,7 @@ export default function PublishControl({ postId }: PublishControlProps) {
             ? draft.identity_id
             : (response.items.find((identity) => identity.is_default) ?? response.items[0])?.id;
         if (!selected) {
-          window.location.href = "/app/settings/identities";
+          window.location.href = "/app/identities";
           return;
         }
         setIdentityId(selected);
@@ -159,8 +160,10 @@ export default function PublishControl({ postId }: PublishControlProps) {
       });
 
       if (response.mode === "scheduled") {
+        updateDraftStatus(postId, "scheduled", response.scheduled_at);
         setNotice(`已排程：${formatLocalDateTime(new Date(response.scheduled_at))} 發布`);
       } else {
+        updateDraftStatus(postId, "published");
         setResults(response.results);
       }
     } catch (requestError) {

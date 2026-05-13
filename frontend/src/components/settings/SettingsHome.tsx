@@ -5,14 +5,14 @@ const settingsCards = [
     title: "身份管理",
     label: "Identities",
     description: "建立品牌身份、設定預設身份，並管理每個身份底下的發布帳號。",
-    href: "/app/settings/identities",
+    href: "/app/identities",
     action: "管理身份",
   },
   {
     title: "帳戶管理",
     label: "Account",
     description: "查看登入帳號、目前方案與使用限制，或登出目前工作階段。",
-    href: "/app/settings/account",
+    href: "/app/account",
     action: "查看帳戶",
   },
 ];

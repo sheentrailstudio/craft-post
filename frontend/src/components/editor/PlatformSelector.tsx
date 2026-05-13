@@ -40,7 +40,7 @@ export default function PlatformSelector({
               </span>
               <span>{platform.display_name}</span>
               {disabled ? (
-                <Link className="text-sm text-[var(--accent)]" href="/app/settings/identities">
+                <Link className="text-sm text-[var(--accent)]" href="/app/identities">
                   連結帳號
                 </Link>
               ) : (
