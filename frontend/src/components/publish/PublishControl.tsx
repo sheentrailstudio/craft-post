@@ -6,8 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BestTimeSuggestion,
   connectSocialAccount,
+  getIdentities,
   getBestTime,
   getPlatforms,
+  Identity,
   Platform,
   publishPost,
   PublishResult,
@@ -19,6 +21,7 @@ type PublishControlProps = {
 
 type PublishDraft = {
   text: string;
+  identity_id: string | null;
   platforms: string[];
   media: {
     aspectRatio: string;
@@ -57,6 +60,8 @@ const DEFAULT_PLATFORMS: Platform[] = [
 
 export default function PublishControl({ postId }: PublishControlProps) {
   const [draft] = useState<PublishDraft>(() => readStoredDraft());
+  const [identities, setIdentities] = useState<Identity[]>([]);
+  const [identityId, setIdentityId] = useState<string | null>(draft.identity_id);
   const [platforms, setPlatforms] = useState<Platform[]>(DEFAULT_PLATFORMS);
   const [platformTexts, setPlatformTexts] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -79,10 +84,22 @@ export default function PublishControl({ postId }: PublishControlProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getPlatforms()
-      .then(setPlatforms)
+    getIdentities()
+      .then(async (response) => {
+        setIdentities(response.items);
+        const selected =
+          draft.identity_id && response.items.some((identity) => identity.id === draft.identity_id)
+            ? draft.identity_id
+            : (response.items.find((identity) => identity.is_default) ?? response.items[0])?.id;
+        if (!selected) {
+          window.location.href = "/app/settings/identities";
+          return;
+        }
+        setIdentityId(selected);
+        setPlatforms(await getPlatforms(selected));
+      })
       .catch(() => setPlatforms(DEFAULT_PLATFORMS));
-  }, []);
+  }, [draft.identity_id]);
 
   useEffect(() => {
     if (mode !== "scheduled") return;
@@ -116,6 +133,7 @@ export default function PublishControl({ postId }: PublishControlProps) {
 
   const canSubmit =
     !isSubmitting &&
+    Boolean(identityId) &&
     draft.platforms.length > 0 &&
     !hasOverLimit &&
     (mode === "immediate" || (date !== "" && time !== "" && scheduleError === null));
@@ -130,6 +148,7 @@ export default function PublishControl({ postId }: PublishControlProps) {
 
     try {
       const response = await publishPost({
+        identity_id: identityId ?? "",
         platforms: draft.platforms,
         platform_texts: Object.fromEntries(
           draft.platforms.map((platform) => [platform, platformTexts[platform] ?? ""]),
@@ -171,6 +190,11 @@ export default function PublishControl({ postId }: PublishControlProps) {
     );
   }
 
+  async function updateIdentity(nextIdentityId: string) {
+    setIdentityId(nextIdentityId);
+    setPlatforms(await getPlatforms(nextIdentityId));
+  }
+
   return (
     <div className="mx-auto grid max-w-4xl gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -200,6 +224,22 @@ export default function PublishControl({ postId }: PublishControlProps) {
           </div>
         </section>
       ) : null}
+
+      <section className="surface p-5">
+        <p className="text-label mb-3">Identity</p>
+        <select
+          className="input-surface w-full px-4 py-3 outline-none"
+          value={identityId ?? ""}
+          onChange={(event) => updateIdentity(event.target.value)}
+        >
+          {identities.map((identity) => (
+            <option key={identity.id} value={identity.id}>
+              {identity.name}
+              {identity.is_default ? " (Default)" : ""}
+            </option>
+          ))}
+        </select>
+      </section>
 
       <section className="surface p-5">
         <p className="text-label mb-3">Platform copy</p>
@@ -355,11 +395,16 @@ export default function PublishControl({ postId }: PublishControlProps) {
             {platforms.map((platform) => (
               <button
                 className="btn btn-secondary btn-sm"
+                disabled={!identityId}
                 key={platform.id}
                 type="button"
-                onClick={() => connectSocialAccount(platform.id)}
+                onClick={() => {
+                  if (identityId) connectSocialAccount(platform.id, identityId).catch(() => null);
+                }}
               >
-                連結 {platform.display_name}
+                {platform.account_connected
+                  ? `${platform.display_name} ${platform.account_username}`
+                  : `連結 ${platform.display_name}`}
               </button>
             ))}
           </div>
@@ -437,6 +482,7 @@ function readStoredDraft(): PublishDraft {
   if (typeof window === "undefined") {
     return {
       text: DEFAULT_TEXT,
+      identity_id: null,
       platforms: ["instagram", "threads"],
       media: null,
     };
@@ -446,6 +492,7 @@ function readStoredDraft(): PublishDraft {
   if (!stored) {
     return {
       text: DEFAULT_TEXT,
+      identity_id: null,
       platforms: ["instagram", "threads"],
       media: null,
     };
@@ -455,6 +502,7 @@ function readStoredDraft(): PublishDraft {
     const parsed = JSON.parse(stored) as PublishDraft;
     return {
       text: parsed.text?.trim() || DEFAULT_TEXT,
+      identity_id: parsed.identity_id ?? null,
       platforms: parsed.platforms?.length
         ? parsed.platforms
         : ["instagram", "threads"],
@@ -463,6 +511,7 @@ function readStoredDraft(): PublishDraft {
   } catch {
     return {
       text: DEFAULT_TEXT,
+      identity_id: null,
       platforms: ["instagram", "threads"],
       media: null,
     };

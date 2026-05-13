@@ -5,10 +5,13 @@ from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.core.token_store import get_token
+from app.api.deps import check_publish_access
+from app.core.auth import AuthUser, get_current_user
+from app.core.database import SupabaseServiceClient, get_supabase_service
+from app.core.security import decrypt_token
 from app.services.publish.registry import PlatformRegistry
 
 
@@ -28,6 +31,7 @@ BEST_TIMES = {
 
 
 class PublishRequest(BaseModel):
+    identity_id: str
     platforms: list[str] = Field(..., min_length=1)
     platform_texts: dict[str, str]
     media_urls: list[str] = []
@@ -35,36 +39,57 @@ class PublishRequest(BaseModel):
 
 
 @router.post("/publish", status_code=202)
-async def publish(body: PublishRequest):
+async def publish(
+    body: PublishRequest,
+    user: AuthUser = Depends(get_current_user),
+    _profile: dict = Depends(check_publish_access),
+    db: SupabaseServiceClient = Depends(get_supabase_service),
+):
     for platform in body.platforms:
         _get_adapter_or_404(platform)
 
+    await _get_identity_or_404(db, body.identity_id, user.id)
+    accounts = await _get_accounts_for_platforms(db, body.identity_id, user.id, body.platforms)
+
     if body.scheduled_at is None:
-        results = await asyncio.gather(
-            *[
-                PlatformRegistry.get(platform).publish(
-                    text=body.platform_texts.get(platform, ""),
-                    media_urls=body.media_urls,
-                    token=get_token(platform) or "",
+        publish_jobs = []
+        immediate_results: dict[str, dict] = {}
+
+        for platform in body.platforms:
+            account = accounts.get(platform)
+            if not account:
+                immediate_results[platform] = _failed(platform, "ACCOUNT_NOT_CONNECTED")
+                continue
+            if account.get("status") != "connected" or _is_token_expired(account):
+                immediate_results[platform] = _failed(platform, "TOKEN_EXPIRED")
+                continue
+            publish_jobs.append(
+                (
+                    platform,
+                    PlatformRegistry.get(platform).publish(
+                        text=body.platform_texts.get(platform, ""),
+                        media_urls=body.media_urls,
+                        token=decrypt_token(account["access_token_encrypted"]),
+                    ),
                 )
-                for platform in body.platforms
-            ],
+            )
+
+        results = await asyncio.gather(
+            *[job for _platform, job in publish_jobs],
             return_exceptions=True,
         )
 
+        for (platform, _job), result in zip(publish_jobs, results):
+            immediate_results[platform] = {
+                "platform": platform,
+                "success": not isinstance(result, Exception) and result.success,
+                "url": result.url if not isinstance(result, Exception) else None,
+                "error": str(result) if isinstance(result, Exception) else result.error,
+            }
+
         return {
             "mode": "immediate",
-            "results": [
-                {
-                    "platform": platform,
-                    "success": not isinstance(result, Exception) and result.success,
-                    "url": result.url if not isinstance(result, Exception) else None,
-                    "error": str(result)
-                    if isinstance(result, Exception)
-                    else result.error,
-                }
-                for platform, result in zip(body.platforms, results)
-            ],
+            "results": [immediate_results[platform] for platform in body.platforms],
         }
 
     scheduled_at = _ensure_aware_utc(body.scheduled_at)
@@ -75,7 +100,10 @@ async def publish(body: PublishRequest):
 
 
 @router.get("/publish/best-time")
-async def best_time(platforms: str):
+async def best_time(
+    platforms: str,
+    _user: AuthUser = Depends(get_current_user),
+):
     requested = [item.strip() for item in platforms.split(",") if item.strip()]
     now = datetime.now(TAIPEI)
     suggestions = []
@@ -125,3 +153,47 @@ def _next_local_datetime(now: datetime, hhmm: str) -> datetime:
     if candidate <= now:
         candidate += timedelta(days=1)
     return candidate
+
+
+async def _get_identity_or_404(
+    db: SupabaseServiceClient, identity_id: str, user_id: str
+) -> dict:
+    identity = await db.select(
+        "identities",
+        params={
+            "id": f"eq.{identity_id}",
+            "user_id": f"eq.{user_id}",
+            "select": "id",
+            "limit": "1",
+        },
+        maybe_single=True,
+    )
+    if not identity:
+        raise HTTPException(status_code=404, detail={"code": "IDENTITY_NOT_FOUND"})
+    return identity
+
+
+async def _get_accounts_for_platforms(
+    db: SupabaseServiceClient, identity_id: str, user_id: str, platforms: list[str]
+) -> dict[str, dict]:
+    accounts = await db.select(
+        "social_accounts",
+        params={
+            "identity_id": f"eq.{identity_id}",
+            "user_id": f"eq.{user_id}",
+            "platform": f"in.({','.join(platforms)})",
+            "select": "platform,status,token_expires_at,access_token_encrypted",
+        },
+    )
+    return {account["platform"]: account for account in accounts}
+
+
+def _is_token_expired(account: dict) -> bool:
+    expires_at = account.get("token_expires_at")
+    if not expires_at:
+        return False
+    return datetime.fromisoformat(expires_at.replace("Z", "+00:00")) <= datetime.now(timezone.utc)
+
+
+def _failed(platform: str, code: str) -> dict:
+    return {"platform": platform, "success": False, "url": None, "error": code}

@@ -26,7 +26,46 @@ export type Platform = {
   token_expired: boolean;
 };
 
+export type SocialAccount = {
+  id: string;
+  platform: "instagram" | "threads";
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  status: "connected" | "expired" | "revoked";
+  token_expires_at: string | null;
+};
+
+export type Identity = {
+  id: string;
+  name: string;
+  description: string | null;
+  avatar_color: string;
+  is_default: boolean;
+  social_accounts: SocialAccount[];
+};
+
+export type IdentityLimits = {
+  plan: "free" | "basic" | "pro";
+  max_identities: number;
+  max_accounts_per_identity: number;
+  can_publish?: boolean;
+};
+
+export type IdentitiesResponse = {
+  items: Identity[];
+  limits: IdentityLimits;
+};
+
+export type IdentityPayload = {
+  name: string;
+  description?: string | null;
+  avatar_color: string;
+  is_default?: boolean;
+};
+
 export type PublishPayload = {
+  identity_id: string;
   platforms: string[];
   platform_texts: Record<string, string>;
   media_urls?: string[];
@@ -64,6 +103,20 @@ export type BestTimeResponse = {
   suggestions: BestTimeSuggestion[];
   recommended: BestTimeSuggestion;
 };
+
+export class ApiError extends Error {
+  code?: string;
+  upgradeUrl?: string;
+  status: number;
+
+  constructor(message: string, status: number, code?: string, upgradeUrl?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.upgradeUrl = upgradeUrl;
+  }
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -119,8 +172,9 @@ export async function generateCaption(
   return data.refined ?? "";
 }
 
-export async function getPlatforms(): Promise<Platform[]> {
-  const response = await fetch(`${API_URL}/api/platforms`, {
+export async function getPlatforms(identityId?: string): Promise<Platform[]> {
+  const query = identityId ? `?identity_id=${encodeURIComponent(identityId)}` : "";
+  const response = await fetch(`${API_URL}/api/platforms${query}`, {
     method: "GET",
     headers: await authHeaders(),
   });
@@ -131,6 +185,59 @@ export async function getPlatforms(): Promise<Platform[]> {
   }
 
   return response.json();
+}
+
+export async function getIdentities(): Promise<IdentitiesResponse> {
+  const response = await fetch(`${API_URL}/api/identities`, {
+    method: "GET",
+    headers: await authHeaders(),
+  });
+
+  if (!response.ok) throw await readApiError(response);
+  return response.json();
+}
+
+export async function createIdentity(payload: IdentityPayload): Promise<Identity> {
+  const response = await fetch(`${API_URL}/api/identities`, {
+    method: "POST",
+    headers: await authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) throw await readApiError(response);
+  return response.json();
+}
+
+export async function updateIdentity(
+  id: string,
+  payload: Partial<IdentityPayload>,
+): Promise<Identity> {
+  const response = await fetch(`${API_URL}/api/identities/${id}`, {
+    method: "PATCH",
+    headers: await authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) throw await readApiError(response);
+  return response.json();
+}
+
+export async function deleteIdentity(id: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/identities/${id}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+
+  if (!response.ok) throw await readApiError(response);
+}
+
+export async function disconnectSocialAccount(accountId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/social/accounts/${accountId}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+
+  if (!response.ok) throw await readApiError(response);
 }
 
 export async function publishPost(
@@ -169,8 +276,18 @@ export async function getBestTime(
   return response.json();
 }
 
-export function connectSocialAccount(platform: string): void {
-  window.location.href = `${API_URL}/api/social/connect/${platform}`;
+export async function connectSocialAccount(platform: string, identityId: string): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/api/social/connect/${platform}?identity_id=${encodeURIComponent(identityId)}`,
+    {
+      method: "GET",
+      headers: await authHeaders(),
+    },
+  );
+
+  if (!response.ok) throw await readApiError(response);
+  const data = (await response.json()) as { url?: string };
+  if (data.url) window.location.href = data.url;
 }
 
 export async function ensureBackendProfile(): Promise<void> {
@@ -203,25 +320,28 @@ async function authHeaders(headers: HeadersInit = {}): Promise<HeadersInit> {
 }
 
 async function readErrorMessage(response: Response) {
+  const error = await readApiError(response);
+  return error.message;
+}
+
+async function readApiError(response: Response): Promise<ApiError> {
   try {
     const error = await response.json();
-    if (error?.code === "INVALID_TOKEN" || error?.detail?.code === "INVALID_TOKEN") {
+    const code = error?.code ?? error?.detail?.code;
+    const message = error?.message ?? error?.detail?.message ?? code ?? "請求失敗";
+    const upgradeUrl = error?.upgrade_url ?? error?.detail?.upgrade_url;
+    if (response.status === 401 || code === "INVALID_TOKEN") {
       redirectToLogin();
     }
-    if (typeof error?.message === "string") return error.message;
-    if (typeof error?.code === "string") return error.code;
-    if (typeof error?.detail?.message === "string") return error.detail.message;
-    if (typeof error?.detail?.code === "string") return error.detail.code;
+    return new ApiError(message, response.status, code, upgradeUrl);
   } catch {
-    return "請求失敗";
+    return new ApiError("請求失敗", response.status);
   }
-
-  return "請求失敗";
 }
 
 function redirectToLogin(): void {
   if (typeof window === "undefined") return;
 
   const redirectTo = `${window.location.pathname}${window.location.search}`;
-  window.location.href = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
+  window.location.href = `/login?next=${encodeURIComponent(redirectTo)}`;
 }

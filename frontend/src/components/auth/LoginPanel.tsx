@@ -16,7 +16,7 @@ export default function LoginPanel() {
   const [signingIn, setSigningIn] = useState(false);
 
   const redirectTo = useMemo(() => {
-    const value = searchParams.get("redirectTo");
+    const value = searchParams.get("next") ?? searchParams.get("redirectTo");
     if (!value || !value.startsWith("/") || value.startsWith("//")) {
       return DEFAULT_AUTH_REDIRECT;
     }

@@ -8,7 +8,7 @@ import PromptPane from "@/components/editor/PromptPane";
 import { useEditorState } from "@/hooks/useEditor";
 
 export default function EditorLayout() {
-  const { state, availablePlatforms, strictMaxChars, actions } = useEditorState();
+  const { state, identities, availablePlatforms, strictMaxChars, actions } = useEditorState();
   const canRefine = Boolean(state.draft.trim()) && state.platforms.length > 0;
   const visibleError =
     state.error &&
@@ -54,19 +54,42 @@ export default function EditorLayout() {
       ) : null}
 
       <div className="editor-grid editor-grid-bottom">
-        <PlatformSelector
-          platforms={availablePlatforms}
-          selected={state.platforms}
-          onToggle={actions.togglePlatform}
-        />
+        <section className="surface editor-pane">
+          <h2 className="text-h3 mb-3">身份</h2>
+          {identities.length ? (
+            <select
+              className="input-surface w-full px-4 py-3 outline-none"
+              value={state.identity_id ?? ""}
+              onChange={(event) => actions.setIdentity(event.target.value)}
+            >
+              {identities.map((identity) => (
+                <option key={identity.id} value={identity.id}>
+                  {identity.name}
+                  {identity.is_default ? " (Default)" : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-body">尚未建立身份，前往發布前需要先新增身份。</p>
+          )}
+          <div className="mt-4">
+            <PlatformSelector
+              platforms={availablePlatforms}
+              selected={state.platforms}
+              onToggle={actions.togglePlatform}
+            />
+          </div>
+        </section>
         <EditorToolbar
           canRefine={canRefine}
           isRefining={state.is_refining}
           onRefine={actions.refineDraft}
           onPublish={() => {
+            if (!state.identity_id) return false;
             sessionStorage.setItem(
               "craftpost.publishDraft",
               JSON.stringify({
+                identity_id: state.identity_id,
                 text: state.draft,
                 platforms: state.platforms,
                 media: state.media
@@ -82,6 +105,7 @@ export default function EditorLayout() {
                   : null,
               }),
             );
+            return true;
           }}
         />
       </div>

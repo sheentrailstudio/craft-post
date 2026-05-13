@@ -1,6 +1,7 @@
 "use client";
 
 import { Platform } from "@/lib/api";
+import Link from "next/link";
 
 type PlatformSelectorProps = {
   platforms: Platform[];
@@ -14,11 +15,12 @@ export default function PlatformSelector({
   onToggle,
 }: PlatformSelectorProps) {
   return (
-    <section className="surface editor-pane">
+    <div>
       <h2 className="text-h3 mb-3">Publish to</h2>
       <div className="flex flex-wrap gap-2">
         {platforms.map((platform) => {
           const active = selected.includes(platform.id);
+          const disabled = !platform.account_connected || platform.token_expired;
           return (
             <label
               key={platform.id}
@@ -28,12 +30,22 @@ export default function PlatformSelector({
                 className="sr-only"
                 type="checkbox"
                 checked={active}
-                onChange={() => onToggle(platform.id)}
+                disabled={disabled}
+                onChange={() => {
+                  if (!disabled) onToggle(platform.id);
+                }}
               />
               <span className="platform-check" aria-hidden="true">
                 {active ? "✓" : ""}
               </span>
               <span>{platform.display_name}</span>
+              {disabled ? (
+                <Link className="text-sm text-[var(--accent)]" href="/app/settings/identities">
+                  連結帳號
+                </Link>
+              ) : (
+                <span className="text-sm">{platform.account_username}</span>
+              )}
             </label>
           );
         })}
@@ -41,6 +53,6 @@ export default function PlatformSelector({
       {!selected.length ? (
         <p className="mt-3 text-sm text-[var(--error)]">請至少選擇一個平台</p>
       ) : null}
-    </section>
+    </div>
   );
 }

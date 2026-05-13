@@ -17,7 +17,7 @@ export default function AppAuthGate({ children }: AppAuthGateProps) {
     if (!configured || loading || session) return;
 
     const redirectTo = pathname || "/app/drafts/new";
-    router.replace(`/login?redirectTo=${encodeURIComponent(redirectTo)}`);
+    router.replace(`/login?next=${encodeURIComponent(redirectTo)}`);
   }, [configured, loading, pathname, router, session]);
 
   if (!configured) {

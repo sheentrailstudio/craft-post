@@ -92,7 +92,7 @@ async def _ensure_profile(user: AuthUser) -> None:
                 "Content-Type": "application/json",
                 "Prefer": "resolution=merge-duplicates,return=minimal",
             },
-            json=[{"id": user.id, "plan": "free"}],
+            json=[{"user_id": user.id, "email": user.email, "plan": "free"}],
         )
 
     if response.is_error:

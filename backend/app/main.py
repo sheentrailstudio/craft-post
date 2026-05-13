@@ -2,7 +2,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import auth, draft, platforms, publish, social
+from app.api import auth, draft, identities, platforms, publish, social
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.scheduler import dispatch_scheduled_posts, scheduler
@@ -21,8 +21,9 @@ protected_api = [Depends(get_current_user)]
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(draft.router, prefix="/api", dependencies=protected_api)
-app.include_router(platforms.router, prefix="/api", dependencies=protected_api)
-app.include_router(publish.router, prefix="/api", dependencies=protected_api)
+app.include_router(identities.router, prefix="/api")
+app.include_router(platforms.router, prefix="/api")
+app.include_router(publish.router, prefix="/api")
 app.include_router(social.router, prefix="/api")
 
 

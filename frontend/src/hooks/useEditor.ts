@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getPlatforms, Platform, refine } from "@/lib/api";
+import { getIdentities, getPlatforms, Identity, Platform, refine } from "@/lib/api";
 
 export type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
 
@@ -23,6 +23,7 @@ export interface EditorState {
   user_subprompt: string;
   platforms: string[];
   media: MediaAttachment | null;
+  identity_id: string | null;
   is_refining: boolean;
   error: string | null;
 }
@@ -58,18 +59,34 @@ export function useEditorState() {
     user_subprompt: "",
     platforms: ["instagram", "threads"],
     media: null,
+    identity_id: null,
     is_refining: false,
     error: null,
   });
   const [availablePlatforms, setAvailablePlatforms] =
     useState<Platform[]>(DEFAULT_PLATFORMS);
+  const [identities, setIdentities] = useState<Identity[]>([]);
 
   useEffect(() => {
     let active = true;
 
-    getPlatforms()
-      .then((platforms) => {
-        if (active) setAvailablePlatforms(platforms);
+    getIdentities()
+      .then(async (response) => {
+        if (!active) return;
+        setIdentities(response.items);
+        const selectedIdentity =
+          response.items.find((identity) => identity.is_default) ?? response.items[0] ?? null;
+        setState((current) => ({ ...current, identity_id: selectedIdentity?.id ?? null }));
+        const platforms = await getPlatforms(selectedIdentity?.id);
+        if (active) {
+          setAvailablePlatforms(platforms);
+          setState((current) => ({
+            ...current,
+            platforms: current.platforms.filter((id) =>
+              platforms.some((platform) => platform.id === id && platform.account_connected),
+            ),
+          }));
+        }
       })
       .catch(() => {
         if (active) setAvailablePlatforms(DEFAULT_PLATFORMS);
@@ -198,6 +215,25 @@ export function useEditorState() {
     });
   }, []);
 
+  const setIdentity = useCallback(async (identityId: string) => {
+    setState((current) => ({ ...current, identity_id: identityId, error: null }));
+    try {
+      const platforms = await getPlatforms(identityId);
+      setAvailablePlatforms(platforms);
+      setState((current) => ({
+        ...current,
+        platforms: current.platforms.filter((id) =>
+          platforms.some((platform) => platform.id === id && platform.account_connected),
+        ),
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "無法載入身份平台",
+      }));
+    }
+  }, []);
+
   const refineDraft = useCallback(async () => {
     const draft = state.draft.trim();
     if (!draft || !state.platforms.length || state.is_refining) return;
@@ -232,6 +268,7 @@ export function useEditorState() {
 
   return {
     state,
+    identities,
     availablePlatforms,
     selectedPlatforms,
     strictMaxChars,
@@ -243,6 +280,7 @@ export function useEditorState() {
       setDraft,
       setPrompt,
       togglePlatform,
+      setIdentity,
     },
   };
 }
