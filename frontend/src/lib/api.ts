@@ -21,6 +21,10 @@ export type Platform = {
     max_images: number;
     max_videos: number;
   };
+  oauth_required: boolean;
+  supports_images: boolean;
+  supports_video: boolean;
+  supports_scheduling: boolean;
   account_connected: boolean;
   account_username: string | null;
   token_expired: boolean;
@@ -28,12 +32,18 @@ export type Platform = {
 
 export type SocialAccount = {
   id: string;
-  platform: "instagram" | "threads";
+  platform: string;
   username: string;
   display_name: string | null;
   avatar_url: string | null;
   status: "connected" | "expired" | "revoked";
   token_expires_at: string | null;
+  can_publish?: boolean;
+  reconnect_required?: boolean;
+};
+
+export type SocialAccountsResponse = {
+  items: SocialAccount[];
 };
 
 export type Identity = {
@@ -77,6 +87,7 @@ export type PublishResult = {
   success: boolean;
   url: string | null;
   error: string | null;
+  error_code: string | null;
 };
 
 export type PublishResponse =
@@ -240,6 +251,19 @@ export async function disconnectSocialAccount(accountId: string): Promise<void> 
   if (!response.ok) throw await readApiError(response);
 }
 
+export async function getSocialAccounts(identityId: string): Promise<SocialAccountsResponse> {
+  const response = await fetch(
+    `${API_URL}/api/social/accounts?identity_id=${encodeURIComponent(identityId)}`,
+    {
+      method: "GET",
+      headers: await authHeaders(),
+    },
+  );
+
+  if (!response.ok) throw await readApiError(response);
+  return response.json();
+}
+
 export async function publishPost(
   payload: PublishPayload,
 ): Promise<PublishResponse> {
@@ -297,8 +321,7 @@ export async function ensureBackendProfile(): Promise<void> {
   });
 
   if (!response.ok) {
-    const message = await readErrorMessage(response);
-    throw new Error(message);
+    throw await readApiError(response, { redirectOnUnauthorized: false });
   }
 }
 
@@ -324,13 +347,17 @@ async function readErrorMessage(response: Response) {
   return error.message;
 }
 
-async function readApiError(response: Response): Promise<ApiError> {
+async function readApiError(
+  response: Response,
+  options: { redirectOnUnauthorized?: boolean } = {},
+): Promise<ApiError> {
+  const redirectOnUnauthorized = options.redirectOnUnauthorized ?? true;
   try {
     const error = await response.json();
     const code = error?.code ?? error?.detail?.code;
     const message = error?.message ?? error?.detail?.message ?? code ?? "請求失敗";
     const upgradeUrl = error?.upgrade_url ?? error?.detail?.upgrade_url;
-    if (response.status === 401 || code === "INVALID_TOKEN") {
+    if (redirectOnUnauthorized && (response.status === 401 || code === "INVALID_TOKEN")) {
       redirectToLogin();
     }
     return new ApiError(message, response.status, code, upgradeUrl);

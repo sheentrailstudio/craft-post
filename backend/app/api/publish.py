@@ -12,6 +12,7 @@ from app.api.deps import check_publish_access
 from app.core.auth import AuthUser, get_current_user
 from app.core.database import SupabaseServiceClient, get_supabase_service
 from app.core.security import decrypt_token
+from app.services.publish.base import PublishResult
 from app.services.publish.registry import PlatformRegistry
 
 
@@ -58,10 +59,29 @@ async def publish(
         for platform in body.platforms:
             account = accounts.get(platform)
             if not account:
-                immediate_results[platform] = _failed(platform, "ACCOUNT_NOT_CONNECTED")
+                immediate_results[platform] = _failed(platform, "ACCOUNT_NOT_CONNECTED", f"{platform} 尚未連結帳號")
                 continue
             if account.get("status") != "connected" or _is_token_expired(account):
-                immediate_results[platform] = _failed(platform, "TOKEN_EXPIRED")
+                immediate_results[platform] = _failed(platform, "TOKEN_EXPIRED", f"{platform} token 已過期，請重新連結")
+                continue
+            try:
+                access_token = decrypt_token(account["access_token_encrypted"])
+            except HTTPException:
+                immediate_results[platform] = _failed(platform, "TOKEN_DECRYPT_FAILED", "Stored token cannot be decrypted.")
+                continue
+
+            account_for_adapter = {**account, "access_token": access_token}
+            validation_errors = await PlatformRegistry.get(platform).validate(
+                text=body.platform_texts.get(platform, ""),
+                media_urls=body.media_urls,
+                account=account_for_adapter,
+            )
+            if validation_errors:
+                immediate_results[platform] = _failed(
+                    platform,
+                    validation_errors[0].code,
+                    "；".join(error.message for error in validation_errors),
+                )
                 continue
             publish_jobs.append(
                 (
@@ -69,7 +89,7 @@ async def publish(
                     PlatformRegistry.get(platform).publish(
                         text=body.platform_texts.get(platform, ""),
                         media_urls=body.media_urls,
-                        token=decrypt_token(account["access_token_encrypted"]),
+                        account=account_for_adapter,
                     ),
                 )
             )
@@ -80,12 +100,7 @@ async def publish(
         )
 
         for (platform, _job), result in zip(publish_jobs, results):
-            immediate_results[platform] = {
-                "platform": platform,
-                "success": not isinstance(result, Exception) and result.success,
-                "url": result.url if not isinstance(result, Exception) else None,
-                "error": str(result) if isinstance(result, Exception) else result.error,
-            }
+            immediate_results[platform] = _result_to_response(platform, result)
 
         return {
             "mode": "immediate",
@@ -182,7 +197,10 @@ async def _get_accounts_for_platforms(
             "identity_id": f"eq.{identity_id}",
             "user_id": f"eq.{user_id}",
             "platform": f"in.({','.join(platforms)})",
-            "select": "platform,status,token_expires_at,access_token_encrypted",
+            "select": (
+                "platform,status,token_expires_at,access_token_encrypted,"
+                "provider_account_id,platform_account_id,username"
+            ),
         },
     )
     return {account["platform"]: account for account in accounts}
@@ -195,5 +213,23 @@ def _is_token_expired(account: dict) -> bool:
     return datetime.fromisoformat(expires_at.replace("Z", "+00:00")) <= datetime.now(timezone.utc)
 
 
-def _failed(platform: str, code: str) -> dict:
-    return {"platform": platform, "success": False, "url": None, "error": code}
+def _failed(platform: str, code: str, message: str) -> dict:
+    return {
+        "platform": platform,
+        "success": False,
+        "url": None,
+        "error": message,
+        "error_code": code,
+    }
+
+
+def _result_to_response(platform: str, result: PublishResult | BaseException) -> dict:
+    if isinstance(result, Exception):
+        return _failed(platform, "PLATFORM_EXCEPTION", str(result))
+    return {
+        "platform": platform,
+        "success": result.success,
+        "url": result.url,
+        "error": result.error,
+        "error_code": result.error_code,
+    }

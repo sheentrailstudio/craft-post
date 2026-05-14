@@ -26,23 +26,38 @@ create table if not exists social_accounts (
   id uuid primary key default gen_random_uuid(),
   identity_id uuid not null references identities(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
-  platform text not null check (platform in ('instagram', 'threads')),
+  platform text not null,
   platform_account_id text not null,
+  provider_user_id text,
+  provider_account_id text,
   username text not null,
   display_name text,
   avatar_url text,
   access_token_encrypted text not null,
   refresh_token_encrypted text,
+  token_type text,
   token_expires_at timestamptz,
   scopes text[] not null default '{}',
   status text not null default 'connected' check (status in ('connected', 'expired', 'revoked')),
   connected_at timestamptz not null default now(),
+  last_connected_at timestamptz,
+  last_error_code text,
+  last_error_message text,
   updated_at timestamptz not null default now(),
   unique(identity_id, platform, platform_account_id)
 );
 
 create index if not exists social_accounts_user_id_idx on social_accounts(user_id);
 create index if not exists social_accounts_identity_id_idx on social_accounts(identity_id);
+
+alter table social_accounts
+  drop constraint if exists social_accounts_platform_check,
+  add column if not exists provider_user_id text,
+  add column if not exists provider_account_id text,
+  add column if not exists token_type text,
+  add column if not exists last_connected_at timestamptz,
+  add column if not exists last_error_code text,
+  add column if not exists last_error_message text;
 
 alter table profiles enable row level security;
 alter table identities enable row level security;

@@ -32,7 +32,8 @@ async def get_current_user(
 
 
 async def _verify_access_token(token: str) -> AuthUser:
-    if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
+    auth_api_key = settings.SUPABASE_ANON_KEY or settings.SUPABASE_SERVICE_KEY
+    if not settings.SUPABASE_URL or not auth_api_key:
         raise HTTPException(
             status_code=500,
             detail={
@@ -45,7 +46,7 @@ async def _verify_access_token(token: str) -> AuthUser:
         response = await client.get(
             f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/user",
             headers={
-                "apikey": settings.SUPABASE_ANON_KEY,
+                "apikey": auth_api_key,
                 "Authorization": f"Bearer {token}",
             },
         )

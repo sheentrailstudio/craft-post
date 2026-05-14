@@ -44,6 +44,10 @@ const DEFAULT_PLATFORMS: Platform[] = [
     display_name: "Instagram",
     max_chars: 2200,
     media_limits: { max_images: 10, max_videos: 1 },
+    oauth_required: true,
+    supports_images: true,
+    supports_video: true,
+    supports_scheduling: false,
     account_connected: false,
     account_username: null,
     token_expired: false,
@@ -53,6 +57,10 @@ const DEFAULT_PLATFORMS: Platform[] = [
     display_name: "Threads",
     max_chars: 500,
     media_limits: { max_images: 10, max_videos: 1 },
+    oauth_required: true,
+    supports_images: true,
+    supports_video: true,
+    supports_scheduling: false,
     account_connected: false,
     account_username: null,
     token_expired: false,
@@ -131,11 +139,15 @@ export default function PublishControl({ postId }: PublishControlProps) {
   const hasOverLimit = selectedPlatforms.some(
     (platform) => (platformTexts[platform.id] ?? "").length > platform.max_chars,
   );
+  const publishableSelected = selectedPlatforms.filter(
+    (platform) => platform.account_connected && !platform.token_expired,
+  );
 
   const canSubmit =
     !isSubmitting &&
     Boolean(identityId) &&
     draft.platforms.length > 0 &&
+    publishableSelected.length > 0 &&
     !hasOverLimit &&
     (mode === "immediate" || (date !== "" && time !== "" && scheduleError === null));
 
@@ -154,7 +166,7 @@ export default function PublishControl({ postId }: PublishControlProps) {
         platform_texts: Object.fromEntries(
           draft.platforms.map((platform) => [platform, platformTexts[platform] ?? ""]),
         ),
-        media_urls: [],
+        media_urls: draft.media?.items.map((item) => item.url) ?? [],
         scheduled_at:
           mode === "scheduled" ? new Date(`${date}T${time}:00`).toISOString() : null,
       });
@@ -251,6 +263,7 @@ export default function PublishControl({ postId }: PublishControlProps) {
             const value = platformTexts[platform.id] ?? draft.text;
             const isOpen = openPlatforms[platform.id] ?? false;
             const overLimit = value.length > platform.max_chars;
+            const isBlocked = !platform.account_connected || platform.token_expired;
 
             return (
               <div
@@ -280,8 +293,14 @@ export default function PublishControl({ postId }: PublishControlProps) {
                       transition={{ duration: 0.22, ease: "easeOut" }}
                     >
                       <div className="border-t border-[var(--bg-border)] p-4">
+                        {isBlocked ? (
+                          <div className="mb-3 rounded-[var(--radius-sm)] border border-[var(--warning)] bg-[var(--warning-muted)] px-3 py-2 text-sm text-[var(--warning)]">
+                            {platform.token_expired ? "連線已過期，請重新連結。" : "此身份尚未連結此平台，送出時會略過並回傳未連結結果。"}
+                          </div>
+                        ) : null}
                         <textarea
                           className="input-surface min-h-36 w-full resize-none p-4 leading-7 outline-none"
+                          disabled={isBlocked}
                           value={value}
                           onChange={(event) =>
                             setPlatformTexts((current) => ({
@@ -393,6 +412,20 @@ export default function PublishControl({ postId }: PublishControlProps) {
       </section>
 
       <section className="surface p-5">
+        {selectedPlatforms.length ? (
+          <div className="mb-4 grid gap-1 text-sm text-[var(--text-secondary)]">
+            {selectedPlatforms.map((platform) => (
+              <p key={platform.id}>
+                {platform.display_name}{" "}
+                {platform.account_connected && !platform.token_expired
+                  ? "將發布"
+                  : platform.token_expired
+                    ? "連線已過期，會略過"
+                    : "尚未連結，會略過"}
+              </p>
+            ))}
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             {platforms.map((platform) => (

@@ -45,7 +45,7 @@ def verify_oauth_state(value: str) -> dict[str, Any]:
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
-            detail={"code": "INVALID_OAUTH_STATE", "message": "OAuth state is invalid or expired."},
+            detail={"code": "OAUTH_STATE_INVALID", "message": "OAuth state is invalid or expired."},
         ) from exc
 
     if not hmac.compare_digest(_signature(encoded), signature):
@@ -56,7 +56,7 @@ def verify_oauth_state(value: str) -> dict[str, Any]:
     except (ValueError, json.JSONDecodeError) as exc:
         raise HTTPException(
             status_code=400,
-            detail={"code": "INVALID_OAUTH_STATE", "message": "OAuth state is invalid or expired."},
+            detail={"code": "OAUTH_STATE_INVALID", "message": "OAuth state is invalid or expired."},
         ) from exc
 
     if int(payload.get("exp", 0)) < int(datetime.now(timezone.utc).timestamp()):
@@ -101,5 +101,5 @@ def _b64url_decode(value: str) -> bytes:
 def raise_invalid_state() -> None:
     raise HTTPException(
         status_code=400,
-        detail={"code": "INVALID_OAUTH_STATE", "message": "OAuth state is invalid or expired."},
+        detail={"code": "OAUTH_STATE_INVALID", "message": "OAuth state is invalid or expired."},
     )

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -39,6 +41,10 @@ async def get_platforms(
             "display_name": adapter.meta.display_name,
             "max_chars": adapter.meta.max_chars,
             "media_limits": adapter.meta.media_limits,
+            "oauth_required": adapter.meta.oauth_required,
+            "supports_images": adapter.meta.supports_images,
+            "supports_video": adapter.meta.supports_video,
+            "supports_scheduling": adapter.meta.supports_scheduling,
             "account_connected": accounts_by_platform.get(adapter.meta.id, {}).get("status")
             == "connected",
             "account_username": accounts_by_platform.get(adapter.meta.id, {}).get("username"),

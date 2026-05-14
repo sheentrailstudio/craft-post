@@ -55,8 +55,8 @@ export default function LoginPanel() {
     setSigningIn(true);
     setError(null);
 
-    const callbackUrl = new URL("/login", window.location.origin);
-    callbackUrl.searchParams.set("redirectTo", redirectTo);
+    window.localStorage.setItem("craftpost_auth_next", redirectTo);
+    const callbackUrl = new URL("/auth/callback", window.location.origin);
 
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",

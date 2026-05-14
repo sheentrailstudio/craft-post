@@ -9,18 +9,16 @@ import {
   deleteIdentity,
   disconnectSocialAccount,
   getIdentities,
+  getPlatforms,
   Identity,
   IdentityLimits,
+  Platform,
   SocialAccount,
   updateIdentity,
   connectSocialAccount,
 } from "@/lib/api";
 
 const COLORS = ["#6366f1", "#10b981", "#ff5c3a", "#f59e0b", "#ef4444", "#06b6d4", "#c084fc", "#f0ede8"];
-const PLATFORMS = [
-  { id: "instagram", label: "Instagram" },
-  { id: "threads", label: "Threads" },
-] as const;
 
 type FormState = {
   name: string;
@@ -33,12 +31,14 @@ export default function IdentitiesSettings() {
   const searchParams = useSearchParams();
   const [items, setItems] = useState<Identity[]>([]);
   const [limits, setLimits] = useState<IdentityLimits | null>(null);
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice] = useState<string | null>(() => {
     const connected = searchParams.get("connected");
     return connected ? `${connected} 已連結` : null;
   });
+  const [connectError] = useState<string | null>(() => searchParams.get("connect_error"));
   const [editing, setEditing] = useState<Identity | "new" | null>(null);
   const [connecting, setConnecting] = useState<Identity | null>(null);
   const [deleting, setDeleting] = useState<Identity | null>(null);
@@ -53,9 +53,10 @@ export default function IdentitiesSettings() {
     setLoading(true);
     setError(null);
     try {
-      const response = await getIdentities();
+      const [response, platformResponse] = await Promise.all([getIdentities(), getPlatforms()]);
       setItems(response.items);
       setLimits(response.limits);
+      setPlatforms(platformResponse);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "無法載入身份");
     } finally {
@@ -146,6 +147,11 @@ export default function IdentitiesSettings() {
           {notice}
         </p>
       ) : null}
+      {connectError ? (
+        <p className="rounded-[var(--radius-sm)] border border-[var(--error)] bg-[var(--error-muted)] px-3 py-2 text-sm text-[var(--error)]">
+          連結失敗：{connectError}
+        </p>
+      ) : null}
       {error ? (
         <p className="rounded-[var(--radius-sm)] border border-[var(--error)] bg-[var(--error-muted)] px-3 py-2 text-sm text-[var(--error)]">
           {error}
@@ -179,6 +185,7 @@ export default function IdentitiesSettings() {
           <IdentityCard
             key={identity.id}
             identity={identity}
+            platforms={platforms}
             onConnect={() => setConnecting(identity)}
             onDelete={() => setDeleting(identity)}
             onDisconnect={handleDisconnect}
@@ -199,6 +206,7 @@ export default function IdentitiesSettings() {
       {connecting ? (
         <ConnectModal
           identity={connecting}
+          platforms={platforms}
           onClose={() => setConnecting(null)}
           onDisconnect={handleDisconnect}
         />
@@ -216,6 +224,7 @@ export default function IdentitiesSettings() {
 
 function IdentityCard({
   identity,
+  platforms,
   onConnect,
   onDelete,
   onDisconnect,
@@ -223,6 +232,7 @@ function IdentityCard({
   onSetDefault,
 }: {
   identity: Identity;
+  platforms: Platform[];
   onConnect: () => void;
   onDelete: () => void;
   onDisconnect: (account: SocialAccount) => void;
@@ -264,11 +274,11 @@ function IdentityCard({
       </div>
 
       <div className="mt-5 grid gap-2">
-        {PLATFORMS.map((platform) => {
+        {platforms.map((platform) => {
           const account = identity.social_accounts.find((item) => item.platform === platform.id);
           return (
             <div className="account-row" key={platform.id}>
-              <span className="text-h3">{platform.label}</span>
+              <span className="text-h3">{platform.display_name}</span>
               {account ? (
                 <>
                   <span className="text-body">{account.username}</span>
@@ -282,7 +292,7 @@ function IdentityCard({
                     type="button"
                     onClick={() => onDisconnect(account)}
                   >
-                    Disconnect
+                    斷開
                   </button>
                 </>
               ) : (
@@ -381,10 +391,12 @@ function IdentityFormModal({
 
 function ConnectModal({
   identity,
+  platforms,
   onClose,
   onDisconnect,
 }: {
   identity: Identity;
+  platforms: Platform[];
   onClose: () => void;
   onDisconnect: (account: SocialAccount) => void;
 }) {
@@ -406,13 +418,16 @@ function ConnectModal({
   return (
     <Modal onClose={onClose} title="連結社群帳號">
       <div className="grid gap-3">
-        {PLATFORMS.map((platform) => {
+        {platforms.map((platform) => {
           const account = accounts[platform.id] as SocialAccount | undefined;
+          const needsReconnect = account ? account.status !== "connected" || isExpired(account) : false;
           return (
             <div className="account-row" key={platform.id}>
-              <span className="text-h3">{platform.label}</span>
+              <span className="text-h3">{platform.display_name}</span>
               <span className="text-body">
-                {account ? `已連結 ${account.username}` : "未連結"}
+                {account
+                  ? `${needsReconnect ? "需要重新連結" : "已連結"} ${account.username}`
+                  : "未連結"}
               </span>
               <button
                 className="btn btn-secondary btn-sm"
@@ -427,7 +442,7 @@ function ConnectModal({
                   type="button"
                   onClick={() => onDisconnect(account)}
                 >
-                  Disconnect
+                  斷開
                 </button>
               ) : null}
             </div>
