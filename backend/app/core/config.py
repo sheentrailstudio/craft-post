@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     TOKEN_ENCRYPTION_KEY: Optional[str] = None
 
     model_config = SettingsConfigDict(env_file=("backend/.env", ".env"), extra="ignore")
+
+    @field_validator("FRONTEND_URL", "BACKEND_URL", mode="after")
+    @classmethod
+    def normalize_base_url(cls, value: str) -> str:
+        return value.rstrip("/")
 
     @property
     def instagram_client_id(self) -> Optional[str]:

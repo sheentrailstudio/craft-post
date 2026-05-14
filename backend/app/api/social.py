@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import secrets
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from typing import Optional
 
@@ -19,6 +19,7 @@ router = APIRouter()
 
 @router.get("/social/connect/{platform}")
 async def connect(
+    request: Request,
     platform: str,
     identity_id: str,
     user: AuthUser = Depends(get_current_user),
@@ -43,12 +44,13 @@ async def connect(
             "nonce": secrets.token_urlsafe(16),
         }
     )
-    url = await adapter.build_oauth_url(state, _callback_url(platform))
+    url = await adapter.build_oauth_url(state, _callback_url(platform, request))
     return {"url": url}
 
 
 @router.get("/social/callback/{platform}")
 async def callback(
+    request: Request,
     platform: str,
     code: Optional[str] = None,
     state: Optional[str] = None,
@@ -74,7 +76,7 @@ async def callback(
         ):
             return _redirect_error("OAUTH_STATE_INVALID")
 
-        token = await adapter.exchange_oauth_code(code, _callback_url(platform))
+        token = await adapter.exchange_oauth_code(code, _callback_url(platform, request))
         account = await adapter.fetch_account_profile(token)
         await _get_identity_or_404(db, state_payload["identity_id"], state_payload["user_id"])
     except PlatformOAuthError as exc:
@@ -163,8 +165,18 @@ def _get_adapter_or_404(platform: str):
         raise HTTPException(status_code=404, detail={"code": "PLATFORM_NOT_FOUND"}) from exc
 
 
-def _callback_url(platform: str) -> str:
+def _callback_url(platform: str, request: Request | None = None) -> str:
+    if request:
+        proto = _forwarded_header(request, "x-forwarded-proto") or request.url.scheme
+        host = _forwarded_header(request, "x-forwarded-host") or request.headers.get("host")
+        if host:
+            return f"{proto}://{host}/api/social/callback/{platform}"
     return f"{settings.BACKEND_URL}/api/social/callback/{platform}"
+
+
+def _forwarded_header(request: Request, name: str) -> str | None:
+    value = request.headers.get(name)
+    return value.split(",", 1)[0].strip() if value else None
 
 
 def _platform_client_id(platform: str) -> str | None:
